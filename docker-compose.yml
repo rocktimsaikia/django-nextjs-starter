@@ -1,0 +1,61 @@
+services:
+  db:
+    image: mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - 3306:3306
+    command: --default-authentication-plugin=mysql_native_password
+
+  backend:
+    restart: always
+    build: ./backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/main
+      - ./backend/staticfiles:/main/staticfiles
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      DJANGO_SETTINGS_MODULE: "root.settings"
+
+  frontend:
+    restart: always
+    build: ./frontend
+    command: pnpm dev
+    environment:
+      - NODE_ENV=development
+      - INTERNAL_SERVER_URL=http://backend:8000
+      - NEXT_PUBLIC_SERVER_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/main
+      - /main/node_modules
+      - /main/.next
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - 8080:80
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./backend/staticfiles:/main/staticfiles
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  mysql_data:
